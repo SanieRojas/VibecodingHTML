@@ -1,1 +1,1 @@
-Vibe coded several lightweight HTML tools for several purposes 
+Vibe coded lightweight HTML tools for several purposes 
