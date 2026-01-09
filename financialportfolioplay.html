@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio Parlay 1.2</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="branding">
+      <div class="logo">Portfolio Parlay</div>
+      <p class="tagline">Bet smart, beat the street.</p>
+    </div>
+    <div class="top-stats">
+      <div class="stat">
+        <span class="label">Credits</span>
+        <span class="value" id="creditDisplay">1000</span>
+      </div>
+      <div class="stat">
+        <span class="label">Best Run</span>
+        <span class="value" id="bestDisplay">1000</span>
+      </div>
+      <div class="stat">
+        <span class="label">Simulations</span>
+        <span class="value" id="playsDisplay">0</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="resetCredits" class="ghost">Reset Credits</button>
+      <button id="quickHelp" class="ghost">What is this?</button>
+    </div>
+  </div>
+
+  <div class="info-strip">
+    <div class="info-block">1) Draft up to 20 tickers. Filters narrow the universe fast.</div>
+    <div class="info-block">2) Balance weights (equal or manual). Watch live exposure labels.</div>
+    <div class="info-block">3) Pick scenario + optimism/vol sliders for mood swings.</div>
+    <div class="info-block">4) Place bet, simulate, and see if you beat the hurdle.</div>
+  </div>
+
+  <div id="dataStatus" class="data-status">Loading market data…</div>
+
+  <main class="layout">
+    <aside class="panel universe">
+      <div class="panel-header">
+        <div>
+          <h2>Company Universe</h2>
+          <p>Search, filter, and draft up to 20 picks.</p>
+        </div>
+        <span class="pill" id="selectionCount">0/20</span>
+      </div>
+      <div class="filters">
+        <input type="text" id="searchInput" placeholder="Search name or ticker" />
+        <div class="filter-row">
+          <select id="industryFilter">
+            <option value="all">All industries</option>
+          </select>
+          <select id="regionFilter">
+            <option value="all">All regions</option>
+          </select>
+          <select id="riskFilter">
+            <option value="all">All risks</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-hints">
+        <span class="hint-pill">Tip: Filters + search power the sector/region insights below.</span>
+        <span class="hint-pill">Add cards to build your deck. Buttons gray once added.</span>
+      </div>
+      <div class="company-list" id="companyList"></div>
+    </aside>
+
+    <section class="main-grid">
+      <section class="panel portfolio">
+        <div class="panel-header">
+          <div>
+            <h2>My Portfolio</h2>
+            <p>Manage picks, adjust weights, track mix.</p>
+          </div>
+          <div class="mode-toggle">
+            <label><input type="radio" name="allocationMode" value="equal" checked> Equal weight</label>
+            <label><input type="radio" name="allocationMode" value="manual"> Manual %</label>
+          </div>
+        </div>
+        <div class="portfolio-summary">
+          <div>
+            <p class="label">Companies</p>
+            <p class="value" id="portfolioCount">0</p>
+            <p class="micro">Max 20; cards gray when full.</p>
+          </div>
+          <div>
+            <p class="label">Avg expected return</p>
+            <p class="value" id="portfolioReturnPreview">0%</p>
+            <p class="micro">Blended base return (industry + company).</p>
+          </div>
+          <div>
+            <p class="label">Blend risk</p>
+            <p class="value" id="portfolioRiskPreview">-</p>
+            <p class="micro">Weighted volatility snapshot.</p>
+          </div>
+        </div>
+        <div id="portfolioList" class="portfolio-list"></div>
+        <p class="hint">Manual weights auto-normalize; live % labels show resulting allocation.</p>
+      </section>
+
+      <section class="panel scenarios">
+        <div class="panel-header">
+          <div>
+            <h2>Scenario Lab</h2>
+            <p>Pick the climate, place your bet, and roll the sim.</p>
+          </div>
+          <div class="scenario-buttons">
+            <button data-scenario="base" class="chip active">Base</button>
+            <button data-scenario="bull" class="chip">Bull</button>
+            <button data-scenario="bear" class="chip">Bear</button>
+          </div>
+        </div>
+        <div id="scenarioNotes" class="scenario-notes">Base: steady state using base returns and vol.</div>
+
+        <div class="controls-grid">
+          <div class="control">
+            <div class="control-header">
+              <p>Market optimism</p>
+              <span id="optimismValue">1.0x</span>
+            </div>
+            <p class="micro">Boost or dampen returns on top of scenario.</p>
+            <input type="range" id="optimismSlider" min="0.8" max="1.4" step="0.01" value="1" />
+          </div>
+          <div class="control">
+            <div class="control-header">
+              <p>Volatility shock</p>
+              <span id="volatilityValue">1.0x</span>
+            </div>
+            <p class="micro">Stress test the risk profile.</p>
+            <input type="range" id="volatilitySlider" min="0.7" max="1.5" step="0.01" value="1" />
+          </div>
+          <div class="control">
+            <div class="control-header">
+              <p>Bet size (credits)</p>
+              <span id="betPreview">100</span>
+            </div>
+            <p class="micro">Wager uses available credits; payout scales with alpha.</p>
+            <input type="number" id="betInput" min="10" step="10" value="100" />
+          </div>
+          <div class="control">
+            <div class="control-header">
+              <p>Target benchmark</p>
+              <span id="benchmarkLabel">8% hurdle</span>
+            </div>
+            <div class="benchmark-bar">
+              <div class="marker" style="left: 50%"></div>
+            </div>
+            <p class="micro">Beat this to grow credits. Below loses stake.</p>
+          </div>
+        </div>
+
+        <div class="simulate-row">
+          <div>
+            <p class="hint">Payout = bet * (1 + (portfolio - benchmark) * factor). Floor at zero.</p>
+            <p class="hint">Win if blend beats the hurdle; risk reflects weighted volatility.</p>
+          </div>
+          <button id="simulateBtn" class="primary">Simulate</button>
+        </div>
+
+        <div class="results" id="resultsPanel">
+          <div>
+            <p class="label">Expected return</p>
+            <p class="headline" id="resultReturn">-</p>
+            <p class="micro">Scenario-adjusted, weighted.</p>
+          </div>
+          <div>
+            <p class="label">Risk signal</p>
+            <p class="value" id="resultRisk">-</p>
+            <p class="micro">Post-shock volatility.</p>
+          </div>
+          <div>
+            <p class="label">Outcome</p>
+            <p class="value" id="resultOutcome">-</p>
+            <p class="micro">Vs. benchmark.</p>
+          </div>
+        </div>
+        <div class="bar-wrap">
+          <div class="bar" id="portfolioBar"></div>
+          <div class="bar benchmark" id="benchmarkBar"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <section class="panel market">
+    <div class="panel-header">
+      <div>
+        <h2>Market Radar</h2>
+        <p>Sector and region heat. Universe = current filters; Portfolio = your picks.</p>
+      </div>
+      <div class="legend">
+        <span class="legend-dot universe"></span><span class="micro">Universe</span>
+        <span class="legend-dot portfolio"></span><span class="micro">Portfolio</span>
+      </div>
+    </div>
+    <div class="market-grid">
+      <div>
+        <p class="label">Sector mix (universe)</p>
+        <div id="sectorStats" class="stat-bars"></div>
+      </div>
+      <div>
+        <p class="label">Region mix (universe)</p>
+        <div id="regionStats" class="stat-bars"></div>
+      </div>
+      <div>
+        <p class="label">Portfolio by sector</p>
+        <div id="portfolioSectorStats" class="stat-bars"></div>
+      </div>
+      <div>
+        <p class="label">Portfolio by region</p>
+        <div id="portfolioRegionStats" class="stat-bars"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel guide">
+    <div class="panel-header">
+      <div>
+        <h2>How to read this screen</h2>
+        <p>Each block tells you what to do and what it means.</p>
+      </div>
+    </div>
+    <div class="guide-grid">
+      <div class="guide-card">
+        <h4>Filters & search</h4>
+        <p>Slice the universe by industry, region, and risk. These filters also drive the radar above.</p>
+      </div>
+      <div class="guide-card">
+        <h4>Portfolio list</h4>
+        <p>Live normalized weights show your true exposure. Switch to manual to fine-tune allocations.</p>
+      </div>
+      <div class="guide-card">
+        <h4>Scenario lab</h4>
+        <p>Scenario buttons alter return/vol multipliers. Sliders layer on optimism and stress to test resilience.</p>
+      </div>
+      <div class="guide-card">
+        <h4>Market radar</h4>
+        <p>Bar lengths are percentage share. Universe bars respond to filters; portfolio bars reflect actual weighted exposure.</p>
+      </div>
+      <div class="guide-card">
+        <h4>Outcome strip</h4>
+        <p>Headline return is scenario-adjusted. Outcome text compares against the hurdle; bars compare portfolio vs hurdle visually.</p>
+      </div>
+      <div class="guide-card">
+        <h4>Credits</h4>
+        <p>Credits rise when you beat the hurdle by more than 0; lose your bet when you lag. Reset to restart a run.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="tooltip" id="helpTooltip">
+    Build a mix of up to 20 names, adjust weights, pick a scenario, and bet credits. Beat the hurdle to grow your stack.
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
