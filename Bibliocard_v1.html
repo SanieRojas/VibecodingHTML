@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            alert("System Error: " + message + "\nLine: " + lineno);
+        };
+    </script>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Sprint - Literature Review Hub</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3/dist/universal-sentence-encoder.min.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        bg: '#f8fafc',       // Slate 50 (Light Background)
+                        sidebar: '#1e293b',  // Slate 800 (Dark Sidebar)
+                        card: '#ffffff',     // White
+                        cardHover: '#f1f5f9',// Slate 100
+                        accent: '#0f766e',   // Teal 700 (Academic Green)
+                        accentLight: '#14b8a6', 
+                        textMain: '#334155', // Slate 700
+                        textDark: '#0f172a', // Slate 900
+                        textMuted: '#64748b',// Slate 500
+                        success: '#059669',  // Emerald 600
+                        error: '#be123c',    // Rose 700
+                        warning: '#d97706',  // Amber 600
+                        paperBorder: '#e2e8f0',
+                        reading: '#0ea5e9',  // Sky 500 (Reading)
+                        cited: '#7c3aed'     // Violet 600 (Cited)
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { background-color: #f8fafc; color: #334155; font-family: 'Merriweather', 'Georgia', serif; } /* Serif for reading */
+        .ui-font { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; } /* Sans for UI */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .modal-backdrop { background-color: rgba(30, 41, 59, 0.7); backdrop-filter: blur(2px); }
+        .paper-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    </style>
+</head>
+<body class="ui-font">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- ICONS ---
+        const Icon = ({ path, size = 18, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+
+        const Icons = {
+            Book: (props) => <Icon {...props} path={<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>} />,
+            Search: (props) => <Icon {...props} path={<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>} />,
+            CheckCircle: (props) => <Icon {...props} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />,
+            Star: (props) => <Icon {...props} path={<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></>} />,
+            Quote: (props) => <Icon {...props} path={<><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/></>} />,
+            Download: (props) => <Icon {...props} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} />,
+            ArrowLeft: (props) => <Icon {...props} path={<><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></>} />,
+            ArrowRight: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></>} />,
+            Pen: (props) => <Icon {...props} path={<><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></>} />,
+            X: (props) => <Icon {...props} path={<><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>} />,
+            Paste: (props) => <Icon {...props} path={<><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></>} />,
+            Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
+            Save: (props) => <Icon {...props} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+            Trash: (props) => <Icon {...props} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>} />,
+            Folder: (props) => <Icon {...props} path={<><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 2H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></>} />,
+            Link: (props) => <Icon {...props} path={<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>} />,
+            Brain: (props) => <Icon {...props} path={<><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></>} />,
+            Play: (props) => <Icon {...props} path={<><polygon points="5 3 19 12 5 21 5 3"/></>} />,
+            Copy: (props) => <Icon {...props} path={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>} />,
+            FileText: (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>} />,
+            ExternalLink: (props) => <Icon {...props} path={<><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></>} />,
+            HelpCircle: (props) => <Icon {...props} path={<><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></>} />,
+            Glasses: (props) => <Icon {...props} path={<><path d="M6 3v18"/><path d="M18 3v18"/><path d="M6 8h12"/></>} />
+        };
+
+        const openLink = (url) => {
+            if (!url) return;
+            const link = url.match(/^https?:\/\//) ? url : `https://${url}`;
+            window.open(link, '_blank');
+        };
+
+        // --- ML & EDIT COMPONENTS ---
+        
+        let useModel = null;
+        const loadModel = async () => {
+            if (useModel) return useModel;
+            try {
+                if(window.use) {
+                    useModel = await window.use.load();
+                    return useModel;
+                }
+            } catch (e) { console.error("Model Error:", e); return null; }
+        };
+
+        const calculateCosineSimilarity = (vecA, vecB) => {
+            const dotProduct = vecA.dot(vecB);
+            const normA = vecA.norm();
+            const normB = vecB.norm();
+            return dotProduct.div(normA.mul(normB)).dataSync()[0];
+        };
+
+        const EditPaperModal = ({ paper, isOpen, onClose, onSave }) => {
+            if (!isOpen || !paper) return null;
+            const [formData, setFormData] = useState({ ...paper });
+
+            useEffect(() => { setFormData({ ...paper }); }, [paper]);
+
+            const handleChange = (key, val) => {
+                setFormData(prev => ({ ...prev, [key]: val }));
+            };
+
+            const keys = Object.keys(formData).filter(k => k !== 'reviewData' && k !== 'matchScore' && k !== 'id');
+
+            return (
+                <div className="fixed inset-0 z-[100] modal-backdrop flex justify-center items-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col animate-fade-in border border-paperBorder">
+                        <div className="p-4 border-b border-paperBorder flex justify-between items-center bg-slate-50 rounded-t-xl">
+                            <h3 className="text-textDark font-bold text-lg flex items-center gap-2"><Icons.Edit size={20}/> Edit Bibliographic Data</h3>
+                            <button onClick={onClose} className="text-textMuted hover:text-error"><Icons.X size={20}/></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                            {keys.map(key => (
+                                <div key={key} className="space-y-1">
+                                    <label className="text-[10px] uppercase font-bold text-accent tracking-wider">{key.replace(/_/g, ' ')}</label>
+                                    {['abstract', 'findings', 'methodology', 'limitations', 'contributions'].includes(key) ? (
+                                        <textarea 
+                                            className="w-full bg-slate-50 border border-paperBorder rounded px-3 py-2 text-sm text-textDark focus:border-accent outline-none resize-none h-24 font-serif"
+                                            value={formData[key] || ''}
+                                            onChange={(e) => handleChange(key, e.target.value)}
+                                        />
+                                    ) : (
+                                        <input 
+                                            className="w-full bg-slate-50 border border-paperBorder rounded px-3 py-2 text-sm text-textDark focus:border-accent outline-none"
+                                            value={formData[key] || ''}
+                                            onChange={(e) => handleChange(key, e.target.value)}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 border-t border-paperBorder flex justify-end gap-3 bg-slate-50 rounded-b-xl">
+                            <button onClick={onClose} className="px-4 py-2 rounded text-sm text-textMuted hover:text-textDark border border-paperBorder bg-white">Cancel</button>
+                            <button onClick={() => onSave(formData)} className="px-6 py-2 rounded text-sm bg-accent hover:bg-teal-800 text-white font-bold shadow-lg flex items-center gap-2"><Icons.Save size={16}/> Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const UserGuideModal = ({ onClose }) => (
+            <div className="fixed inset-0 z-[80] modal-backdrop flex justify-center items-start overflow-y-auto pt-4 md:pt-10 pb-10 px-4">
+                <div className="max-w-6xl w-full bg-white border border-paperBorder rounded-xl shadow-2xl relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 z-50 bg-slate-100 hover:bg-slate-200 text-textDark rounded-full p-2 transition">
+                        <Icons.X size={24} />
+                    </button>
+                    
+                    <div className="bg-slate-50 p-10 text-center border-b border-paperBorder relative rounded-t-xl">
+                        <h1 className="text-4xl font-bold text-textDark mb-3 tracking-tight font-serif">Research Sprint: Literature Manager</h1>
+                        <p className="text-accent font-bold uppercase tracking-widest text-sm mb-2">For Students, Researchers & Thesis Writers</p>
+                        <p className="text-textMuted text-xs max-w-2xl mx-auto">Organize your bibliography, score papers by relevance to your thesis topic using AI, and export detailed notes.</p>
+                    </div>
+
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-5 rounded border border-paperBorder shadow-sm">
+                            <div className="text-accent font-bold text-sm uppercase mb-2 flex items-center gap-2"><span className="bg-accent text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span> Extract</div>
+                            <p className="text-sm text-textMain mb-2">Use your LLM (ChatGPT/Claude) with the provided <strong>Prompt</strong>. Attach your PDF paper.</p>
+                            <p className="text-xs text-textMuted">The AI will output a JSON block containing the Abstract, Methodology, and Findings.</p>
+                        </div>
+                         <div className="bg-white p-5 rounded border border-paperBorder shadow-sm">
+                            <div className="text-accent font-bold text-sm uppercase mb-2 flex items-center gap-2"><span className="bg-accent text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span> Import & Score</div>
+                            <p className="text-sm text-textMain mb-2">Paste the JSON here. Enter your <strong>Research Question/Thesis Topic</strong> in the input box.</p>
+                            <p className="text-xs text-textMuted">The local AI will score how relevant each paper is to your specific topic.</p>
+                        </div>
+                         <div className="bg-white p-5 rounded border border-paperBorder shadow-sm">
+                            <div className="text-accent font-bold text-sm uppercase mb-2 flex items-center gap-2"><span className="bg-accent text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span> Review & Write</div>
+                            <p className="text-sm text-textMain mb-2">Read summaries side-by-side. Mark papers as "Cited" or "Reading".</p>
+                            <p className="text-xs text-textMuted">Export your curated list to JSON for citation management.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const KpiCard = ({ title, value, subtext, icon: IconComponent, color }) => (
+            <div className="bg-white p-4 rounded-lg border border-paperBorder flex items-center justify-between cursor-default shadow-sm hover:shadow-md transition">
+                <div>
+                    <h3 className="text-textMuted text-xs font-bold uppercase tracking-wider">{title}</h3>
+                    <p className="text-2xl font-bold text-textDark mt-1">{value}</p>
+                    {subtext && <p className="text-[10px] text-textMuted mt-1">{subtext}</p>}
+                </div>
+                {IconComponent && <div className={`p-3 rounded-full bg-opacity-10 ${color.replace('text-', 'bg-')}`}>
+                    <IconComponent className={color} size={20} />
+                </div>}
+            </div>
+        );
+
+        const INITIAL_DATA = [
+            {
+                id: 1,
+                title: "Attention Is All You Need",
+                type: "Conference Paper",
+                authors: "Vaswani et al.",
+                institution: "Google Brain",
+                journal: "NeurIPS 2017",
+                year: "2017",
+                url: "https://arxiv.org/abs/1706.03762",
+                citations: "Cited by 80,000+",
+                impact: "High Impact",
+                pages: "11 pages",
+                abstract: "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks that include an encoder and a decoder. We propose a new simple network architecture, the Transformer, based solely on attention mechanisms.",
+                keywords: "NLP, Transformer, Attention, Deep Learning",
+                methodology: "Introduced Transformer architecture. Tested on WMT 2014 English-to-German translation task.",
+                findings: "The Transformer generalizes well to other tasks. It achieves state-of-the-art results (BLEU 28.4) while being more parallelizable and requiring significantly less time to train.",
+                limitations: "Requires significant memory for long sequences due to self-attention complexity.",
+                contributions: "Foundation of modern LLMs (BERT, GPT).",
+                funding: "Google",
+                related_works: "LSTM, Seq2Seq",
+                data_type: "Text Corpora",
+                notes: ""
+            }
+        ];
+
+        const ResearchHub = () => {
+            const [view, setView] = useState('dashboard');
+            const [isModelLoading, setIsModelLoading] = useState(false);
+            const [isScoring, setIsScoring] = useState(false);
+            const [editingPaper, setEditingPaper] = useState(null);
+            const [promptText, setPromptText] = useState(() => localStorage.getItem('researchPrompt_v1') || `Analyze the provided RESEARCH PAPER / SOURCE and return a Structured JSON object. OUTPUT: STRUCTURED JSON. Return exactly one raw JSON object (no Markdown). Values must be concise. Keys: title, type, authors, institution, journal, year, url, citations, impact, pages, abstract, keywords, methodology, findings, limitations, contributions, funding, related_works, data_type, notes.`);
+            const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+            const [isGuideOpen, setIsGuideOpen] = useState(false);
+            
+            const [groups, setGroups] = useState(() => {
+                const saved = localStorage.getItem('researchGroups_v1');
+                return saved ? JSON.parse(saved) : [{ id: 1, name: "Thesis 2025", lists: [ { id: 101, name: "AI in Education", description: "Literature review for Chapter 2", data: INITIAL_DATA, researchQ: "How does generative AI impact student learning outcomes?" } ] }];
+            });
+
+            const [reviews, setReviews] = useState(() => {
+                const saved = localStorage.getItem('researchReviews_v1');
+                return saved ? JSON.parse(saved) : {};
+            });
+
+            const [activeGroupId, setActiveGroupId] = useState(() => groups[0]?.id || 1);
+            const [activeListId, setActiveListId] = useState(() => groups[0]?.lists[0]?.id || 101);
+
+            useEffect(() => { setIsModelLoading(true); loadModel().then(() => setIsModelLoading(false)); }, []);
+            useEffect(() => { localStorage.setItem('researchGroups_v1', JSON.stringify(groups)); localStorage.setItem('researchReviews_v1', JSON.stringify(reviews)); }, [groups, reviews]);
+            useEffect(() => { localStorage.setItem('researchPrompt_v1', promptText); }, [promptText]);
+
+            const activeGroup = groups.find(g => g.id === activeGroupId) || groups[0];
+            const activeList = activeGroup.lists.find(l => l.id === activeListId) || activeGroup.lists[0];
+            const papers = activeList.data || [];
+
+            // Review Object
+            const getReview = (id) => reviews[id] || { 
+                status: 'inbox', // inbox, reading, finished, cited
+                rating: 0,
+                notes: '', 
+                relevance: 'Unknown'
+            };
+            const updateReview = (id, field, value) => setReviews(prev => ({ ...prev, [id]: { ...getReview(id), [field]: value } }));
+
+            const runMatchScoring = async () => {
+                if (!activeList.researchQ) { alert("Please enter a Research Question/Topic first."); return; }
+                setIsScoring(true);
+                const model = await loadModel();
+                if (!model) { alert("Model failed to load."); setIsScoring(false); return; }
+                try {
+                    const qEmb = await model.embed([activeList.researchQ]);
+                    const qVec = qEmb.slice([0, 0], [1, -1]).squeeze();
+                    const updatedData = [];
+                    const texts = papers.map(p => `${p.title} ${p.abstract} ${p.findings} ${p.methodology}`);
+                    const paperEmbs = await model.embed(texts);
+                    for (let i = 0; i < papers.length; i++) {
+                        const p = papers[i];
+                        const pVec = paperEmbs.slice([i, 0], [1, -1]).squeeze();
+                        const score = calculateCosineSimilarity(qVec, pVec);
+                        updatedData.push({ ...p, matchScore: (score * 100).toFixed(1) });
+                        pVec.dispose();
+                    }
+                    qVec.dispose(); qEmb.dispose(); paperEmbs.dispose();
+                    setGroups(groups.map(g => g.id === activeGroupId ? { ...g, lists: g.lists.map(l => l.id === activeListId ? { ...l, data: updatedData } : l) } : g));
+                    alert("Relevance Scoring Complete!");
+                } catch (e) { alert("Error: " + e.message); } finally { setIsScoring(false); }
+            };
+
+            const sortedPapers = useMemo(() => {
+                // Sort by: Cited > Reading > Inbox > Match Score
+                const statusWeight = { 'cited': 4, 'finished': 3, 'reading': 2, 'inbox': 1 };
+                return [...papers].sort((a, b) => {
+                    const rA = reviews[a.id] || {};
+                    const rB = reviews[b.id] || {};
+                    const wA = statusWeight[rA.status] || 0;
+                    const wB = statusWeight[rB.status] || 0;
+                    if (wA !== wB) return wB - wA;
+                    return (parseFloat(b.matchScore || 0) - parseFloat(a.matchScore || 0));
+                });
+            }, [papers, reviews]);
+
+            // --- IMPORT/EXPORT/EDIT Handlers ---
+            const [compareList, setCompareList] = useState([]);
+            const [selectedId, setSelectedId] = useState(null);
+            const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+            const [jsonText, setJsonText] = useState("");
+            
+            const handleImport = () => {
+                try {
+                    let content = JSON.parse(jsonText);
+                    if (!Array.isArray(content)) content = [content];
+                    const newPapers = content.map(item => ({ ...item, id: item.id || Date.now() + Math.random() }));
+                    setGroups(groups.map(g => g.id === activeGroupId ? { ...g, lists: g.lists.map(l => l.id === activeListId ? { ...l, data: [...l.data, ...newPapers] } : l) } : g));
+                    setJsonText(""); setIsImportModalOpen(false);
+                } catch (e) { alert("Invalid JSON"); }
+            };
+
+            const handleSaveEdit = (updatedPaper) => {
+                setGroups(groups.map(g => g.id === activeGroupId ? { ...g, lists: g.lists.map(l => l.id === activeListId ? { ...l, data: l.data.map(p => p.id === updatedPaper.id ? updatedPaper : p) } : l) } : g));
+                setEditingPaper(null);
+            };
+
+            const toggleCompare = (id) => setCompareList(prev => prev.includes(id) ? prev.filter(x => x !== id) : (prev.length >= 3 ? prev : [...prev, id]));
+            
+            const deletePaper = (id) => { if(confirm("Delete paper?")) setGroups(groups.map(g => ({...g, lists: g.lists.map(l => l.id === activeListId ? {...l, data: l.data.filter(p => p.id !== id)} : l)}))); };
+
+            const handleExport = () => {
+                const data = activeList.data.map(p => ({ ...p, reviewData: getReview(p.id) }));
+                const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+                const node = document.createElement('a'); node.href = str; node.download = "bibliography_export.json";
+                document.body.appendChild(node); node.click(); node.remove();
+            };
+
+            // --- VIEW RENDERERS ---
+            const renderDashboard = () => (
+                <div className="flex min-h-screen text-textMain font-sans">
+                    {/* Sidebar */}
+                    <div className="w-64 bg-sidebar flex flex-col hidden md:flex text-slate-300 border-r border-slate-700">
+                        <div className="p-4 border-b border-slate-700"><h2 className="font-bold text-white flex items-center gap-2 font-serif"><Icons.Book size={18}/> Research Hub</h2></div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                            {groups.map(group => (
+                                <div key={group.id}>
+                                    <div className="flex justify-between items-center mb-2 font-bold text-xs uppercase tracking-wider text-slate-500">
+                                        <div className="flex items-center gap-2"><Icons.Folder size={14}/> {group.name}</div>
+                                    </div>
+                                    <div className="space-y-1 ml-2 border-l border-slate-700 pl-2">
+                                        {group.lists.map(list => (
+                                            <div key={list.id} onClick={() => { setActiveGroupId(group.id); setActiveListId(list.id); }} className={`group flex justify-between items-center px-3 py-2 rounded text-sm cursor-pointer transition ${activeListId === list.id ? 'bg-accent text-white' : 'hover:bg-slate-700'}`}>
+                                                <span className="truncate">{list.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 p-6 space-y-6 animate-fade-in overflow-y-auto h-screen bg-bg">
+                        <header className="flex justify-between items-start border-b border-paperBorder pb-4">
+                            <div className="flex-1 mr-8">
+                                <h1 className="text-3xl font-bold text-textDark font-serif mb-1">{activeList.name}</h1>
+                                <p className="text-sm text-textMuted mb-4">{activeList.description}</p>
+                                
+                                {/* Research Question Input */}
+                                <div className="bg-white p-4 rounded-lg shadow-sm border border-paperBorder flex flex-col gap-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-xs font-bold text-accent uppercase tracking-wider flex items-center gap-1"><Icons.Brain size={14}/> Research Topic / Question</label>
+                                        {isScoring && <span className="text-xs text-accent animate-pulse">Analyzing Relevance...</span>}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            className="flex-1 bg-slate-50 border border-paperBorder rounded px-3 py-2 text-sm text-textDark focus:border-accent outline-none font-serif"
+                                            placeholder="e.g., 'Impact of transformers on NLP efficiency' - Used for semantic scoring."
+                                            value={activeList.researchQ || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setGroups(groups.map(g => g.id === activeGroupId ? {...g, lists: g.lists.map(l => l.id === activeListId ? {...l, researchQ: val} : l)} : g));
+                                            }}
+                                        />
+                                        <button onClick={runMatchScoring} disabled={isScoring || isModelLoading} className="px-4 py-2 bg-accent hover:bg-teal-800 text-white rounded font-bold text-xs flex items-center gap-2 disabled:opacity-50">
+                                            <Icons.Play size={14}/> Score Relevance
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 items-center">
+                                <button onClick={() => {navigator.clipboard.writeText(promptText); alert("Prompt Copied!")}} className="text-accent text-xs font-bold px-3 py-2 border border-accent rounded hover:bg-accent hover:text-white transition flex items-center gap-1"><Icons.Copy size={14}/> Copy Prompt</button>
+                                <button onClick={() => setIsImportModalOpen(true)} className="bg-textDark text-white px-4 py-2 rounded text-sm shadow hover:bg-slate-700 flex items-center gap-2"><Icons.Paste size={16}/> Import JSON</button>
+                                <button onClick={handleExport} className="bg-white border border-paperBorder text-textMain px-4 py-2 rounded text-sm shadow hover:bg-slate-50 flex items-center gap-2"><Icons.Download size={16}/> Export</button>
+                                <button onClick={() => setIsGuideOpen(true)} className="text-textMuted hover:text-textDark"><Icons.HelpCircle size={20}/></button>
+                            </div>
+                        </header>
+
+                        {/* KPIs */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            <KpiCard title="Total Sources" value={papers.length} icon={Icons.Book} color="text-textDark" />
+                            <KpiCard title="Avg. Citations" value={Math.round(papers.reduce((acc, p) => acc + (parseInt(p.citations?.replace(/\D/g, '')||0)), 0) / (papers.length||1))} icon={Icons.Quote} color="text-accent" />
+                            <KpiCard title="To Read" value={papers.filter(p => !['cited','finished'].includes(reviews[p.id]?.status)).length} icon={Icons.Glasses} color="text-reading" />
+                            <KpiCard title="Cited in Thesis" value={papers.filter(p => reviews[p.id]?.status === 'cited').length} icon={Icons.CheckCircle} color="text-cited" />
+                        </div>
+
+                        {/* Table */}
+                        <div className="bg-white rounded-lg border border-paperBorder shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-paperBorder flex justify-between items-center bg-slate-50">
+                                <h3 className="font-bold text-textDark font-serif">Bibliography</h3>
+                                <button disabled={compareList.length < 2} onClick={() => setView('compare')} className={`px-3 py-1 text-xs rounded border ${compareList.length < 2 ? 'opacity-50 cursor-not-allowed' : 'bg-accent text-white border-accent'}`}>Compare ({compareList.length})</button>
+                            </div>
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-100 text-textMuted uppercase text-xs font-bold">
+                                    <tr>
+                                        <th className="px-4 py-3 w-10"></th>
+                                        <th className="px-4 py-3 w-16 text-center">Score</th>
+                                        <th className="px-4 py-3">Title & Authors</th>
+                                        <th className="px-4 py-3">Year</th>
+                                        <th className="px-4 py-3">Type</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {sortedPapers.map(p => {
+                                        const r = getReview(p.id);
+                                        return (
+                                            <tr key={p.id} className="hover:bg-slate-50 transition">
+                                                <td className="px-4 py-3"><input type="checkbox" checked={compareList.includes(p.id)} onChange={() => toggleCompare(p.id)} className="rounded text-accent focus:ring-accent" /></td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {p.matchScore ? (
+                                                        <span className={`text-xs font-bold px-2 py-1 rounded ${parseFloat(p.matchScore) > 75 ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500'}`}>{Math.round(p.matchScore)}%</span>
+                                                    ) : '-'}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="font-bold text-textDark font-serif text-base">{p.title}</div>
+                                                    <div className="text-xs text-textMuted">{p.authors} • {p.journal}</div>
+                                                </td>
+                                                <td className="px-4 py-3 text-textMain">{p.year}</td>
+                                                <td className="px-4 py-3 text-textMuted text-xs">{p.type}</td>
+                                                <td className="px-4 py-3">
+                                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide ${
+                                                         r.status === 'cited' ? 'bg-purple-100 text-purple-700' :
+                                                         r.status === 'finished' ? 'bg-green-100 text-green-700' :
+                                                         r.status === 'reading' ? 'bg-sky-100 text-sky-700' :
+                                                         'bg-slate-100 text-slate-500'
+                                                     }`}>{r.status}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <button onClick={() => setEditingPaper(p)} className="text-textMuted hover:text-accent"><Icons.Edit size={16}/></button>
+                                                        <button onClick={() => {setSelectedId(p.id); setView('detail');}} className="text-accent hover:text-teal-800 border border-accent/20 hover:bg-accent/10 px-3 py-1 rounded text-xs font-bold">Review</button>
+                                                        <button onClick={() => deletePaper(p.id)} className="text-textMuted hover:text-error"><Icons.Trash size={16}/></button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // --- COMPARE VIEW ---
+            const renderCompare = () => {
+                const selected = papers.filter(p => compareList.includes(p.id));
+                return (
+                    <div className="h-screen flex flex-col bg-bg">
+                        <header className="p-4 bg-white border-b border-paperBorder flex justify-between items-center shadow-sm">
+                            <h1 className="text-xl font-bold font-serif text-textDark">Comparative Analysis</h1>
+                            <button onClick={() => setView('dashboard')} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm font-bold text-textDark">Back to Library</button>
+                        </header>
+                        <div className="flex-1 overflow-x-auto p-6">
+                            <div className="flex gap-6 min-w-max">
+                                {selected.map(p => (
+                                    <div key={p.id} className="w-[400px] bg-white rounded-xl border border-paperBorder shadow-lg flex flex-col">
+                                        <div className="p-5 border-b border-paperBorder bg-slate-50 rounded-t-xl">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="text-xs uppercase font-bold text-accent tracking-wide">{p.year} • {p.type}</span>
+                                                <button onClick={() => toggleCompare(p.id)}><Icons.X size={16} className="text-textMuted hover:text-error"/></button>
+                                            </div>
+                                            <h2 className="font-bold text-lg font-serif leading-tight text-textDark mb-1">{p.title}</h2>
+                                            <p className="text-xs text-textMuted">{p.authors}</p>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-5 space-y-4 text-sm text-textMain">
+                                            <div><strong className="block text-xs uppercase text-slate-400 mb-1">Abstract</strong><p className="leading-relaxed bg-slate-50 p-2 rounded border border-slate-100">{p.abstract}</p></div>
+                                            <div><strong className="block text-xs uppercase text-slate-400 mb-1">Methodology</strong><p className="leading-relaxed">{p.methodology}</p></div>
+                                            <div><strong className="block text-xs uppercase text-slate-400 mb-1">Key Findings</strong><p className="leading-relaxed text-textDark font-medium">{p.findings}</p></div>
+                                            <div><strong className="block text-xs uppercase text-slate-400 mb-1">Limitations</strong><p className="leading-relaxed text-error/80">{p.limitations}</p></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- DETAIL VIEW ---
+            const renderDetail = () => {
+                const p = papers.find(i => i.id === selectedId);
+                const r = getReview(p.id);
+                if (!p) return null;
+                return (
+                    <div className="h-screen flex flex-col bg-slate-50">
+                         <header className="p-4 bg-white border-b border-paperBorder flex justify-between items-center shadow-sm sticky top-0 z-10">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setView('dashboard')} className="p-2 hover:bg-slate-100 rounded-full text-textMuted"><Icons.ArrowLeft size={20}/></button>
+                                <div><h1 className="text-lg font-bold font-serif text-textDark max-w-3xl truncate">{p.title}</h1></div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => openLink(p.url)} className="flex items-center gap-2 text-accent text-sm font-bold hover:underline"><Icons.ExternalLink size={16}/> View Source</button>
+                                <div className="h-6 w-[1px] bg-slate-200"></div>
+                                <select value={r.status} onChange={(e) => updateReview(p.id, 'status', e.target.value)} className="bg-slate-100 border border-slate-200 rounded px-3 py-1 text-sm font-bold text-textDark focus:ring-accent">
+                                    <option value="inbox">Inbox</option>
+                                    <option value="reading">Currently Reading</option>
+                                    <option value="finished">Finished</option>
+                                    <option value="cited">Cited in Thesis</option>
+                                </select>
+                            </div>
+                        </header>
+                        
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="max-w-5xl mx-auto p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+                                {/* Left Meta */}
+                                <div className="space-y-6">
+                                    <div className="bg-white p-5 rounded-lg shadow-sm border border-paperBorder">
+                                        <h3 className="text-xs font-bold uppercase text-slate-400 mb-4 tracking-wider">Publication Details</h3>
+                                        <div className="space-y-4 text-sm">
+                                            <div><div className="text-textMuted text-xs">Authors</div><div className="font-bold text-textDark">{p.authors}</div></div>
+                                            <div><div className="text-textMuted text-xs">Journal/Conference</div><div className="font-medium text-textDark">{p.journal}</div></div>
+                                            <div><div className="text-textMuted text-xs">Institution</div><div className="font-medium text-textDark">{p.institution}</div></div>
+                                            <div className="flex justify-between border-t border-slate-100 pt-3">
+                                                <div><div className="text-textMuted text-xs">Year</div><div className="font-bold">{p.year}</div></div>
+                                                <div className="text-right"><div className="text-textMuted text-xs">Citations</div><div className="font-bold text-accent">{p.citations}</div></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
+                                        <h3 className="text-xs font-bold uppercase text-indigo-400 mb-2 tracking-wider">My Notes</h3>
+                                        <textarea className="w-full h-40 bg-white border border-indigo-200 rounded p-3 text-sm resize-none focus:outline-none focus:border-indigo-400" placeholder="Jot down quotes or thoughts..." value={r.notes} onChange={(e) => updateReview(p.id, 'notes', e.target.value)}></textarea>
+                                    </div>
+                                </div>
+
+                                {/* Main Content */}
+                                <div className="md:col-span-2 space-y-8">
+                                    <section>
+                                        <h2 className="text-xl font-bold font-serif text-textDark mb-3 border-b border-slate-200 pb-2">Abstract</h2>
+                                        <p className="text-lg leading-relaxed text-textMain font-serif">{p.abstract}</p>
+                                        <div className="flex flex-wrap gap-2 mt-4">
+                                            {p.keywords && p.keywords.split(',').map(k => <span key={k} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs border border-slate-200">{k.trim()}</span>)}
+                                        </div>
+                                    </section>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <section className="bg-white p-5 rounded border-l-4 border-accent shadow-sm">
+                                            <h3 className="font-bold text-accent mb-2 flex items-center gap-2"><Icons.Brain size={16}/> Methodology</h3>
+                                            <p className="text-sm leading-relaxed text-textMain">{p.methodology}</p>
+                                        </section>
+                                        <section className="bg-white p-5 rounded border-l-4 border-reading shadow-sm">
+                                            <h3 className="font-bold text-reading mb-2 flex items-center gap-2"><Icons.Star size={16}/> Key Findings</h3>
+                                            <p className="text-sm leading-relaxed text-textMain">{p.findings}</p>
+                                        </section>
+                                    </div>
+
+                                    <section className="bg-rose-50 p-5 rounded border border-rose-100">
+                                        <h3 className="font-bold text-error mb-2 text-sm uppercase">Limitations & Gaps</h3>
+                                        <p className="text-sm text-textMain">{p.limitations || "No limitations explicitly stated."}</p>
+                                    </section>
+
+                                    <section>
+                                        <h3 className="font-bold text-textDark mb-2 text-sm uppercase">Contributions & Impact</h3>
+                                        <p className="text-sm text-textMain">{p.contributions}</p>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div>
+                     {isGuideOpen && <UserGuideModal onClose={() => setIsGuideOpen(false)} />}
+                     {isImportModalOpen && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop p-4">
+                            <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl border border-paperBorder flex flex-col max-h-[90vh]">
+                                <div className="p-4 border-b border-paperBorder flex justify-between items-center"><h3 className="text-textDark font-bold text-lg">Import JSON</h3><button onClick={() => setIsImportModalOpen(false)}><Icons.X size={20}/></button></div>
+                                <div className="p-4 flex-1 overflow-hidden"><textarea className="w-full h-64 bg-slate-50 border border-paperBorder rounded p-3 text-sm font-mono focus:border-accent outline-none resize-none" placeholder='Paste JSON here...' value={jsonText} onChange={(e) => setJsonText(e.target.value)}></textarea></div>
+                                <div className="p-4 border-t border-paperBorder flex justify-end gap-3"><button onClick={handleImport} className="px-6 py-2 rounded text-sm bg-accent hover:bg-teal-800 text-white font-bold">Import Data</button></div>
+                            </div>
+                        </div>
+                    )}
+                     <EditPaperModal paper={editingPaper} isOpen={!!editingPaper} onClose={() => setEditingPaper(null)} onSave={handleSaveEdit} />
+                     
+                     {view === 'dashboard' && renderDashboard()}
+                     {view === 'detail' && renderDetail()}
+                     {view === 'compare' && renderCompare()}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ResearchHub />);
+    </script>
+</body>
+</html>
